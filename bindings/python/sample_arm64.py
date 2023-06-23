@@ -64,7 +64,7 @@ def test_arm64():
         print(">>> X15 = 0x%x" %x15)
 
     except UcError as e:
-        print("ERROR: %s" % e)
+        print(f"ERROR: {e}")
 
 
 def test_arm64_read_sctlr():
@@ -83,7 +83,7 @@ def test_arm64_read_sctlr():
         print(">>> SCTLR_EL1 = 0x%x" % val)
 
     except UcError as e:
-        print("ERROR: %s" % e)
+        print(f"ERROR: {e}")
 
 def test_arm64_hook_mrs():
     def _hook_mrs(uc, reg, cp_reg, _):
@@ -114,7 +114,7 @@ def test_arm64_hook_mrs():
         print(f">>> X2 = {mu.reg_read(UC_ARM64_REG_X2):x}")
 
     except UcError as e:
-        print("ERROR: %s" % e)
+        print(f"ERROR: {e}")
 
 if __name__ == '__main__':
     test_arm64()

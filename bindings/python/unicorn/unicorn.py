@@ -64,9 +64,7 @@ def _load_lib(path, lib_name):
             _load_win_support(path)
 
         lib_file = os.path.join(path, lib_name)
-        dll = ctypes.cdll.LoadLibrary(lib_file)
-        #print('SUCCESS')
-        return dll
+        return ctypes.cdll.LoadLibrary(lib_file)
     except OSError as e:
         #print('FAIL to load %s' %lib_file, e)
         return None
@@ -783,7 +781,7 @@ class Uc(object):
         l = self.ctl_get_exits_cnt()
         arr = (ctypes.c_uint64 * l)()
         self.ctl(self.__ctl_r(uc.UC_CTL_UC_EXITS, 2), ctypes.cast(arr, ctypes.c_void_p), ctypes.c_size_t(l))
-        return [i for i in arr]
+        return list(arr)
 
     def ctl_set_exits(self, exits: List[int]):
         arr = (ctypes.c_uint64 * len(exits))()
@@ -867,11 +865,6 @@ class Uc(object):
                 # set callback with wrapper, so it can be called
                 # with this object as param
                 cb = ctypes.cast(UC_HOOK_CODE_CB(self._hookcode_cb), UC_HOOK_CODE_CB)
-                status = _uc.uc_hook_add(
-                    self._uch, ctypes.byref(_h2), htype, cb,
-                    ctypes.cast(self._callback_count, ctypes.c_void_p),
-                    ctypes.c_uint64(begin), ctypes.c_uint64(end)
-                )
             elif htype & (uc.UC_HOOK_MEM_READ_UNMAPPED |
                           uc.UC_HOOK_MEM_WRITE_UNMAPPED |
                           uc.UC_HOOK_MEM_FETCH_UNMAPPED |
@@ -879,19 +872,13 @@ class Uc(object):
                           uc.UC_HOOK_MEM_WRITE_PROT |
                           uc.UC_HOOK_MEM_FETCH_PROT):
                 cb = ctypes.cast(UC_HOOK_MEM_INVALID_CB(self._hook_mem_invalid_cb), UC_HOOK_MEM_INVALID_CB)
-                status = _uc.uc_hook_add(
-                    self._uch, ctypes.byref(_h2), htype, cb,
-                    ctypes.cast(self._callback_count, ctypes.c_void_p),
-                    ctypes.c_uint64(begin), ctypes.c_uint64(end)
-                )
             else:
                 cb = ctypes.cast(UC_HOOK_MEM_ACCESS_CB(self._hook_mem_access_cb), UC_HOOK_MEM_ACCESS_CB)
-                status = _uc.uc_hook_add(
-                    self._uch, ctypes.byref(_h2), htype, cb,
-                    ctypes.cast(self._callback_count, ctypes.c_void_p),
-                    ctypes.c_uint64(begin), ctypes.c_uint64(end)
-                )
-
+            status = _uc.uc_hook_add(
+                self._uch, ctypes.byref(_h2), htype, cb,
+                ctypes.cast(self._callback_count, ctypes.c_void_p),
+                ctypes.c_uint64(begin), ctypes.c_uint64(end)
+            )
         # save the ctype function so gc will leave it alone.
         self._ctype_cbs.append(cb)
 
@@ -1038,12 +1025,10 @@ def debug():
         "ppc": uc.UC_ARCH_PPC,
     }
 
-    all_archs = ""
     keys = archs.keys()
-    for k in sorted(keys):
-        if uc_arch_supported(archs[k]):
-            all_archs += "-%s" % k
-
+    all_archs = "".join(
+        f"-{k}" for k in sorted(keys) if uc_arch_supported(archs[k])
+    )
     major, minor, _combined = uc_version()
 
     return "python-%s-c%u.%u-b%u.%u" % (

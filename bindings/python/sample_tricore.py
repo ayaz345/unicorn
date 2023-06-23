@@ -51,7 +51,7 @@ def test_tricore():
         print(">>> D0 = 0x%x" %r0)
 
     except UcError as e:
-        print("ERROR: %s" % e)
+        print(f"ERROR: {e}")
 
 if __name__ == '__main__':
     test_tricore()

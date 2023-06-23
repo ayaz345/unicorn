@@ -42,7 +42,7 @@ class Emulator:
         try:
             self.mu.emu_start(ip, ip + size, timeout=10000, count=1)
         except UcError as e:
-            print("Error %s" % e)
+            print(f"Error {e}")
 
     def write_data(self, address, content):
         self.mu.mem_write(address, content)
@@ -68,9 +68,7 @@ class Init(regress.RegressTest):
         global mu
         ips = list(range(0xffffffff816a9000, 0xffffffff816af000, 0x1))
         sps = list(range(0xffff88001b800000, 0xffff88001b801000, 0x1))
-        j = 0
-        for i in ips:
-            j += 1
+        for j, i in enumerate(ips, start=1):
             index = ips.index(i)
             self.init_unicorn(i, sps[index], j)
 

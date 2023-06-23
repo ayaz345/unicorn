@@ -63,7 +63,7 @@ def test_riscv():
         print(">>> A1 = 0x%x" %a1)
 
     except UcError as e:
-        print("ERROR: %s" % e)
+        print(f"ERROR: {e}")
 
 
 if __name__ == '__main__':

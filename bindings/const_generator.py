@@ -139,139 +139,136 @@ def gen(lang):
     templ = template[lang]
     for target in include:
         prefix = templ[target]
-        outfile = open(templ['out_file'] %(prefix), 'wb')   # open as binary prevents windows newlines
-        outfile.write((templ['header'] % (prefix)).encode("utf-8"))
-        if target == 'unicorn.h':
-            prefix = ''
-        with open(os.path.join(INCL_DIR, target)) as f:
-            lines = f.readlines()
+        with open(templ['out_file'] %(prefix), 'wb') as outfile:
+            outfile.write((templ['header'] % (prefix)).encode("utf-8"))
+            if target == 'unicorn.h':
+                prefix = ''
+            with open(os.path.join(INCL_DIR, target)) as f:
+                lines = f.readlines()
 
-        previous = {}
-        count = 0
-        skip = 0
-        in_comment = False
-        
-        for lno, line in enumerate(lines):
-            if "/*" in line:
-                in_comment = True
-            if "*/" in line:
-                in_comment = False
-            if in_comment:
-                continue
-            if skip > 0:
-                # Due to clang-format, values may come up in the next line
-                skip -= 1
-                continue
-            line = line.strip()
+            previous = {}
+            count = 0
+            skip = 0
+            in_comment = False
 
-            if line.startswith(MARKUP):  # markup for comments
-                outfile.write(("\n%s%s%s\n" %(templ['comment_open'], \
-                            line.replace(MARKUP, ''), templ['comment_close'])).encode("utf-8"))
-                continue
+            for lno, line in enumerate(lines):
+                if "/*" in line:
+                    in_comment = True
+                if "*/" in line:
+                    in_comment = False
+                if in_comment:
+                    continue
+                if skip > 0:
+                    # Due to clang-format, values may come up in the next line
+                    skip -= 1
+                    continue
+                line = line.strip()
 
-            if line == '' or line.startswith('//'):
-                continue
+                if line.startswith(MARKUP):  # markup for comments
+                    outfile.write(("\n%s%s%s\n" %(templ['comment_open'], \
+                                line.replace(MARKUP, ''), templ['comment_close'])).encode("utf-8"))
+                    continue
 
-            tmp = line.strip().split(',')
-            if len(tmp) >= 2 and tmp[0] != "#define" and not tmp[0].startswith("UC_"):
-                continue
-            for t in tmp:
-                t = t.strip()
-                if not t or t.startswith('//'): continue
-                f = re.split('\s+', t)
+                if line == '' or line.startswith('//'):
+                    continue
 
-                # parse #define UC_TARGET (num)
-                define = False
-                if f[0] == '#define' and len(f) >= 3:
-                    define = True
-                    f.pop(0)
-                    f.insert(1, '=')
-                if f[0].startswith("UC_" + prefix.upper()) or f[0].startswith("UC_CPU"):
-                    if len(f) > 1 and f[1] not in ('//', '='):
-                        print("WARNING: Unable to convert %s" % f)
-                        print("  Line =", line)
-                        continue
-                    elif len(f) > 1 and f[1] == '=':
-                        # Like:
-                        # UC_A = 
-                        #       (1 << 2)
-                        # #define UC_B \
-                        #              (UC_A | UC_C)
-                        # Let's search the next line
-                        if len(f) == 2:
-                            if lno == len(lines) - 1:
-                                print("WARNING: Unable to convert %s" % f)
-                                print("  Line =", line)
-                                continue
-                            skip += 1
-                            next_line = lines[lno + 1]
-                            next_line_tmp = next_line.strip().split(",")
-                            rhs = next_line_tmp[0]
-                        elif f[-1] == "\\":
-                            idx = 0
-                            rhs = ""
-                            while True:
-                                idx += 1
-                                if lno + idx == len(lines):
-                                    print("WARNING: Unable to convert %s" % f)
+                tmp = line.strip().split(',')
+                if len(tmp) >= 2 and tmp[0] != "#define" and not tmp[0].startswith("UC_"):
+                    continue
+                for t in tmp:
+                    t = t.strip()
+                    if not t or t.startswith('//'): continue
+                    f = re.split('\s+', t)
+
+                    # parse #define UC_TARGET (num)
+                    define = False
+                    if f[0] == '#define' and len(f) >= 3:
+                        define = True
+                        f.pop(0)
+                        f.insert(1, '=')
+                    if f[0].startswith(f"UC_{prefix.upper()}") or f[
+                        0
+                    ].startswith("UC_CPU"):
+                        if len(f) > 1 and f[1] not in ('//', '='):
+                            print(f"WARNING: Unable to convert {f}")
+                            print("  Line =", line)
+                            continue
+                        elif len(f) > 1 and f[1] == '=':
+                                                    # Like:
+                                                    # UC_A = 
+                                                    #       (1 << 2)
+                                                    # #define UC_B \
+                                                    #              (UC_A | UC_C)
+                                                    # Let's search the next line
+                            if len(f) == 2:
+                                if lno == len(lines) - 1:
+                                    print(f"WARNING: Unable to convert {f}")
                                     print("  Line =", line)
                                     continue
                                 skip += 1
-                                next_line = lines[lno + idx]
-                                next_line_f = re.split('\s+', next_line.strip())
-                                if next_line_f[-1] == "\\":
-                                    rhs += "".join(next_line_f[:-1])
-                                else:
-                                    rhs += next_line.strip()
-                                    break
+                                next_line = lines[lno + 1]
+                                next_line_tmp = next_line.strip().split(",")
+                                rhs = next_line_tmp[0]
+                            elif f[-1] == "\\":
+                                idx = 0
+                                rhs = ""
+                                while True:
+                                    idx += 1
+                                    if lno + idx == len(lines):
+                                        print(f"WARNING: Unable to convert {f}")
+                                        print("  Line =", line)
+                                        continue
+                                    skip += 1
+                                    next_line = lines[lno + idx]
+                                    next_line_f = re.split('\s+', next_line.strip())
+                                    if next_line_f[-1] == "\\":
+                                        rhs += "".join(next_line_f[:-1])
+                                    else:
+                                        rhs += next_line.strip()
+                                        break
+                            else:
+                                rhs = ''.join(f[2:])
                         else:
-                            rhs = ''.join(f[2:])
-                    else:
-                        rhs = str(count)
+                            rhs = str(count)
 
-                    
-                    lhs = f[0].strip()
-                    #print(f'lhs: {lhs} rhs: {rhs} f:{f}')
-                    # evaluate bitshifts in constants e.g. "UC_X86 = 1 << 1"
-                    match = re.match(r'(?P<rhs>\s*\d+\s*<<\s*\d+\s*)', rhs)
-                    if match:
-                        rhs = str(eval(match.group(1)))
-                    else:
-                        # evaluate references to other constants e.g. "UC_ARM_REG_X = UC_ARM_REG_SP"
-                        match = re.match(r'^([^\d]\w+)$', rhs)
-                        if match:
-                            rhs = previous[match.group(1)]
 
-                    if not rhs.isdigit():
-                        for k, v in previous.items():
-                            rhs = re.sub(r'\b%s\b' % k, v, rhs)
-                        rhs = str(eval(rhs))
+                        lhs = f[0].strip()
+                        if match := re.match(
+                            r'(?P<rhs>\s*\d+\s*<<\s*\d+\s*)', rhs
+                        ):
+                            rhs = str(eval(match[1]))
+                        elif match := re.match(r'^([^\d]\w+)$', rhs):
+                            rhs = previous[match[1]]
 
-                    lhs_strip = re.sub(r'^UC_', '', lhs)
-                    count = int(rhs) + 1
-                    if (count == 1):
-                        outfile.write(("\n").encode("utf-8"))
+                        if not rhs.isdigit():
+                            for k, v in previous.items():
+                                rhs = re.sub(r'\b%s\b' % k, v, rhs)
+                            rhs = str(eval(rhs))
 
-                    outfile.write((templ['line_format'] % (lhs_strip, rhs)).encode("utf-8"))
-                    previous[lhs] = str(rhs)
+                        lhs_strip = re.sub(r'^UC_', '', lhs)
+                        count = int(rhs) + 1
+                        if (count == 1):
+                            outfile.write(("\n").encode("utf-8"))
 
-        outfile.write((templ['footer']).encode("utf-8"))
-        outfile.close()
+                        outfile.write((templ['line_format'] % (lhs_strip, rhs)).encode("utf-8"))
+                        previous[lhs] = str(rhs)
+
+            outfile.write((templ['footer']).encode("utf-8"))
 
 def main():
     lang = sys.argv[1]
     if lang == "all":
         for lang in template.keys():
-            print("Generating constants for {}".format(lang))
+            print(f"Generating constants for {lang}")
             gen(lang)
-    else:
-        if not lang in template:
-            raise RuntimeError("Unsupported binding %s" % lang)
+    elif lang in template:
         gen(lang)
+    else:
+        raise RuntimeError(f"Unsupported binding {lang}")
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage:", sys.argv[0], " <python>")
-        print("Supported: {}".format(["all"] + [x for x in template.keys()]))
+        print(f'Supported: {["all"] + list(template.keys())}')
         sys.exit(1)
     main()

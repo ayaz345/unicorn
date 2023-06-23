@@ -74,7 +74,7 @@ class LogChain:
         self.__linking_fds = {}
 
     def create_chain(self, my_id):
-        if not my_id in self.__chains:
+        if my_id not in self.__chains:
             self.__chains[my_id] = []
         else:
             print("LogChain: id %d existed" % my_id)
@@ -88,7 +88,7 @@ class LogChain:
             print("LogChain: id %d doesn't exist" % id)
 
     def link_fd(self, from_fd, to_fd):
-        if not to_fd in self.__linking_fds:
+        if to_fd not in self.__linking_fds:
             self.__linking_fds[to_fd] = []
 
         self.__linking_fds[to_fd].append(from_fd)
@@ -97,11 +97,14 @@ class LogChain:
         if fd in self.__chains:
             return fd
 
-        for orig_fd, links in self.__linking_fds.items():
-            if fd in links:
-                return orig_fd
-
-        return None
+        return next(
+            (
+                orig_fd
+                for orig_fd, links in self.__linking_fds.items()
+                if fd in links
+            ),
+            None,
+        )
 
     def print_report(self):
         print("""
@@ -159,7 +162,7 @@ def parse_sock_address(sock_addr):
 
 
 def print_sockcall(msg):
-    print(">>> SOCKCALL %s" % msg)
+    print(f">>> SOCKCALL {msg}")
 
 
 # end utilities
@@ -208,7 +211,7 @@ def hook_intr(uc, intno, user_data):
         msg = "read %d bytes from fd(%d) with dummy_content(%s)" % (count, fd, dummy_content)
 
         fd_chains.add_log(fd, msg)
-        print(">>> %s" % msg)
+        print(f">>> {msg}")
     elif eax == 4:  # sys_write
         fd = ebx
         buf = ecx
@@ -218,7 +221,7 @@ def hook_intr(uc, intno, user_data):
 
         msg = "write data=%s count=%d to fd(%d)" % (content, count, fd)
 
-        print(">>> %s" % msg)
+        print(f">>> {msg}")
         fd_chains.add_log(fd, msg)
     elif eax == 5:  # sys_open
         filename_addr = ebx
@@ -233,12 +236,12 @@ def hook_intr(uc, intno, user_data):
 
         fd_chains.create_chain(dummy_fd)
         fd_chains.add_log(dummy_fd, msg)
-        print(">>> %s" % msg)
+        print(f">>> {msg}")
     elif eax == 11:  # sys_execv
         # print(">>> ebx=0x%x, ecx=0x%x, edx=0x%x" % (ebx, ecx, edx))
         filename = read_string(uc, ebx)
 
-        print(">>> SYS_EXECV filename=%s" % filename)
+        print(f">>> SYS_EXECV filename={filename}")
     elif eax == 63:  # sys_dup2
         fd_chains.link_fd(ecx, ebx)
         print(">>> SYS_DUP2 oldfd=%d newfd=%d" % (ebx, ecx))
@@ -272,15 +275,11 @@ def hook_intr(uc, intno, user_data):
             dummy_fd = id_gen.next()
             uc.reg_write(UC_X86_REG_EAX, dummy_fd)
 
-            if family == 2:  # AF_INET 
-
+            if family == 2:
                 msg = "create socket (%s, %s) with fd(%d)" % (ADDR_FAMILY[family], SOCKET_TYPES[sock_type], dummy_fd)
                 fd_chains.create_chain(dummy_fd)
                 fd_chains.add_log(dummy_fd, msg)
                 print_sockcall(msg)
-            elif family == 3:  # AF_INET6
-                pass
-
         elif call == 2:  # sys_bind
             fd = args[0]
             umyaddr = args[1]
@@ -315,13 +314,13 @@ def hook_intr(uc, intno, user_data):
         elif call == 5:  # sys_accept
             fd = args[0]
             upeer_sockaddr = args[1]
-            upeer_addrlen = args[2]
-
             # print(">>> upeer_sockaddr=0x%x, upeer_addrlen=%d" % (upeer_sockaddr, upeer_addrlen))
 
             if upeer_sockaddr == 0x0:
                 print_sockcall("fd(%d) accept client" % fd)
             else:
+                upeer_addrlen = args[2]
+
                 upeer_len, = struct.unpack("<I", uc.mem_read(upeer_addrlen, 4))
 
                 sock_addr = uc.mem_read(upeer_sockaddr, upeer_len)
@@ -392,7 +391,7 @@ def test_i386(code):
         print(">>> Emulation done")
 
     except UcError as e:
-        print("ERROR: %s" % e)
+        print(f"ERROR: {e}")
 
     fd_chains.print_report()
 

@@ -57,7 +57,7 @@ def test_ppc():
         print(">>> r26 = 0x%x" % r26)
 
     except UcError as e:
-        print("ERROR: %s" % e)
+        print(f"ERROR: {e}")
 
 
 if __name__ == '__main__':

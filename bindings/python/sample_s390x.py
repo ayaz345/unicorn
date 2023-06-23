@@ -55,7 +55,7 @@ def test_s390x():
         print(">>> R3 = 0x%x" % r3)
 
     except UcError as e:
-        print("ERROR: %s" % e)
+        print(f"ERROR: {e}")
 
 
 if __name__ == '__main__':

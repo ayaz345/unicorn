@@ -50,8 +50,6 @@ def copy_sources():
     This rearranges the source files under the python distribution
     directory.
     """
-    src = []
-
     shutil.rmtree(SRC_DIR, ignore_errors=True)
     os.mkdir(SRC_DIR)
 
@@ -70,7 +68,7 @@ def copy_sources():
     except OSError:
         pass
 
-    src.extend(glob.glob(os.path.join(ROOT_DIR, "../../*.[ch]")))
+    src = list(glob.glob(os.path.join(ROOT_DIR, "../../*.[ch]")))
     src.extend(glob.glob(os.path.join(ROOT_DIR, "../../*.mk")))
     src.extend(glob.glob(os.path.join(ROOT_DIR, "../../*.cmake")))
 
@@ -81,7 +79,7 @@ def copy_sources():
 
     for filename in src:
         outpath = os.path.join(SRC_DIR, os.path.basename(filename))
-        log.info("%s -> %s" % (filename, outpath))
+        log.info(f"{filename} -> {outpath}")
         shutil.copy(filename, outpath)
 
 def build_libraries():
@@ -122,9 +120,29 @@ def build_libraries():
         conf = 'Debug' if os.getenv('DEBUG', '') else 'Release'
         if not os.path.exists(BUILD_DIR):
             os.mkdir(BUILD_DIR)
-        
-        subprocess.check_call(['cmake', '-B', BUILD_DIR, '-G', "Visual Studio 16 2019", "-A", plat, "-DCMAKE_BUILD_TYPE=" + conf])
-        subprocess.check_call(['msbuild', 'unicorn.sln', '-m', '-p:Platform=' + plat, '-p:Configuration=' + conf], cwd=BUILD_DIR)
+
+        subprocess.check_call(
+            [
+                'cmake',
+                '-B',
+                BUILD_DIR,
+                '-G',
+                "Visual Studio 16 2019",
+                "-A",
+                plat,
+                f"-DCMAKE_BUILD_TYPE={conf}",
+            ]
+        )
+        subprocess.check_call(
+            [
+                'msbuild',
+                'unicorn.sln',
+                '-m',
+                f'-p:Platform={plat}',
+                f'-p:Configuration={conf}',
+            ],
+            cwd=BUILD_DIR,
+        )
 
         obj_dir = os.path.join(BUILD_DIR, conf)
         shutil.copy(os.path.join(obj_dir, LIBRARY_FILE), LIBS_DIR)
@@ -135,14 +153,14 @@ def build_libraries():
             os.mkdir(BUILD_DIR)
         conf = 'Debug' if os.getenv('DEBUG', '') else 'Release'
 
-        cmake_args = ["cmake", '-B', BUILD_DIR, "-DCMAKE_BUILD_TYPE=" + conf]
+        cmake_args = ["cmake", '-B', BUILD_DIR, f"-DCMAKE_BUILD_TYPE={conf}"]
         if os.getenv("TRACE", ""):
             cmake_args += ["-DUNICORN_TRACER=on"]
         subprocess.check_call(cmake_args)
         os.chdir(BUILD_DIR)
         threads = os.getenv("THREADS", "4")
-        subprocess.check_call(["cmake", "--build", ".", "-j" + threads])
-    
+        subprocess.check_call(["cmake", "--build", ".", f"-j{threads}"])
+
         shutil.copy(LIBRARY_FILE, LIBS_DIR)
         shutil.copy(STATIC_LIBRARY_FILE, LIBS_DIR)
 
@@ -172,11 +190,11 @@ class custom_bdist_egg(bdist_egg):
 def dummy_src():
     return []
 
-cmdclass = {}
-cmdclass['build'] = custom_build
-cmdclass['sdist'] = custom_sdist
-cmdclass['bdist_egg'] = custom_bdist_egg
-
+cmdclass = {
+    'build': custom_build,
+    'sdist': custom_sdist,
+    'bdist_egg': custom_bdist_egg,
+}
 if 'bdist_wheel' in sys.argv and '--plat-name' not in sys.argv:
     idx = sys.argv.index('bdist_wheel') + 1
     sys.argv.insert(idx, '--plat-name')
@@ -186,7 +204,7 @@ if 'bdist_wheel' in sys.argv and '--plat-name' not in sys.argv:
         # linux builds should be built in the centos 5 vm for maximum compatibility
         # see https://github.com/pypa/manylinux
         # see also https://github.com/angr/angr-dev/blob/master/bdist.sh
-        sys.argv.insert(idx + 1, 'manylinux1_' + platform.machine())
+        sys.argv.insert(idx + 1, f'manylinux1_{platform.machine()}')
     elif 'mingw' in name:
         if IS_64BITS:
             sys.argv.insert(idx + 1, 'win_amd64')
